@@ -8,6 +8,7 @@
 
 #include <cmath>
 #include <vector>
+#include <numeric>
 
 #include <Eigen/Dense>
 #include <Eigen/SVD>
@@ -87,23 +88,46 @@ bool ICPSVDRegistration::ScanMatch(
     // TODO: first option -- implement all computing logic on your own
     //
     // do estimation:
+    Eigen::Matrix4f current_transform;
+    current_transform.setIdentity();
     int curr_iter = 0;
-    while (curr_iter < max_iter_) {
+    bool is_significant = true;
+    while ((curr_iter < max_iter_) && is_significant) {
+        LOG(INFO) << "curr_iter:" << curr_iter << std::endl;
         // TODO: apply current estimation:
-
+        pcl::transformPointCloud(*transformed_input_source, *transformed_input_source, current_transform);
         // TODO: get correspondence:
-
+        std::vector<Eigen::Vector3f> points_target;
+        std::vector<Eigen::Vector3f> points_input;
+        auto num = GetCorrespondence(transformed_input_source, points_target, points_input);
         // TODO: do not have enough correspondence -- break:
+        if (num < 500) {
+            LOG(INFO) << "quit corr num" << num << std::endl;
+            break;
+        }
+
+        float correspondences_cur_mse = 0;        
+        for (int i=0; i<num; i++) {
+            correspondences_cur_mse += (points_input[i] - points_target[i]).topRows(2).norm();
+        }
+        correspondences_cur_mse /= num;
+        LOG(INFO) << " correspondences_cur_mse: " << correspondences_cur_mse << std::endl;
 
         // TODO: update current transform:
+        GetTransform(points_target, points_input, current_transform);
 
         // TODO: whether the transformation update is significant:
-
+        is_significant = IsSignificant(current_transform, trans_eps_);
+        LOG(INFO) << "is_significant: " << is_significant << std::endl;
         // TODO: update transformation:
+        transformation_ = current_transform * transformation_;
 
         ++curr_iter;
     }
-
+    if (curr_iter >= max_iter_) {
+        LOG(INFO) << "quit exceed max iter" << std::endl;
+    }
+    
     // set output:
     result_pose = transformation_ * predict_pose;
     pcl::transformPointCloud(*input_source_, *result_cloud_ptr, result_pose);
@@ -121,26 +145,51 @@ size_t ICPSVDRegistration::GetCorrespondence(
     size_t num_corr = 0;
 
     // TODO: set up point correspondence
+    const auto cloud_size = input_source->size();
+    std::vector<int> k_indices(1);
+    std::vector<float> k_sqr_distances(1);
 
+    for (size_t i=0; i<cloud_size; ++i) {
+        int num = input_target_kdtree_->nearestKSearch((*input_source)[i], 1, k_indices, k_sqr_distances);
+        if (num <= 0) continue;
+        if (k_sqr_distances[0] > MAX_CORR_DIST_SQR) continue;
+        auto corr_pt = (*input_target_)[k_indices[0]];
+        xs.emplace_back(Eigen::Vector3f{corr_pt.x, corr_pt.y, corr_pt.z});
+        ys.emplace_back(Eigen::Vector3f{(*input_source)[i].x, (*input_source)[i].y, (*input_source)[i].z});
+    }
+    num_corr = ys.size(); 
     return num_corr;
 }
 
 void ICPSVDRegistration::GetTransform(
     const std::vector<Eigen::Vector3f> &xs,
     const std::vector<Eigen::Vector3f> &ys,
-    Eigen::Matrix4f &transformation_
+    Eigen::Matrix4f &transformation
 ) {
     const size_t N = xs.size();
 
     // TODO: find centroids of mu_x and mu_y:
-
+    Eigen::Vector3f mu_x = std::accumulate(xs.begin(), xs.end(), Eigen::Vector3f{0, 0, 0}) / xs.size();
+    Eigen::Vector3f mu_y = std::accumulate(ys.begin(), ys.end(), Eigen::Vector3f{0, 0, 0}) / ys.size();
     // TODO: build H:
-
+    Eigen::Matrix3f H = Eigen::Matrix3f::Zero();
+    for (size_t i=0; i<N; ++i) {
+        H += (ys[i]-mu_y) * (xs[i]-mu_x).transpose();
+    }
     // TODO: solve R:
+    Eigen::JacobiSVD<Eigen::MatrixXf> svd(H, Eigen::ComputeThinU | Eigen::ComputeThinV );
+	Eigen::Matrix3f V = svd.matrixV(), U = svd.matrixU();
+    Eigen::Quaternionf q(V*U.transpose());
+    Eigen::Matrix3f R = q.normalized().toRotationMatrix();
+    LOG(INFO) << "R.determinant:" << R.determinant() << std::endl;
 
     // TODO: solve t:
-
+    Eigen::Vector3f t = mu_x - R * mu_y;
     // TODO: set output:
+    transformation = Eigen::Matrix4f::Identity();
+
+    transformation.block<3, 3>(0, 0) = R;
+    transformation.block<3, 1>(0, 3) = t;
 }
 
 bool ICPSVDRegistration::IsSignificant(
@@ -155,6 +204,8 @@ bool ICPSVDRegistration::IsSignificant(
             (transformation.block<3, 3>(0, 0).trace() - 1.0f) / 2.0f
         )
     );
+    LOG(INFO) << "translation_magnitude: " << translation_magnitude <<
+                 " rotation_magnitude:" << rotation_magnitude << std::endl;
 
     return (
         (translation_magnitude > trans_eps) || 
