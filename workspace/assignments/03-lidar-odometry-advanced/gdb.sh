@@ -1,0 +1,1 @@
+gdb --args /workspace/assignments/02-lidar-odometry-basic/install/lib/lidar_localization/front_end_node __name:=front_end_node __log:=/root/.ros/log/a98e74d0-6327-11ec-b798-0242ac130002/front_end_node-3.log
