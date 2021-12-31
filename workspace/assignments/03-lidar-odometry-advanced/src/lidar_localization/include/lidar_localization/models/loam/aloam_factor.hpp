@@ -65,6 +65,85 @@ struct LidarEdgeFactor
 	double s;
 };
 
+class EdgeAnalyticCostFunction : public ceres::SizedCostFunction<1, 7> {
+	public:
+		EdgeAnalyticCostFunction(Eigen::Vector3d curr_point_, Eigen::Vector3d last_point_a_, Eigen::Vector3d last_point_b_)
+			: curr_point(curr_point_), last_point_a(last_point_a_)， last_point_b(last_point_b_) {}
+		~EdgeAnalyticCostFunction() {}
+		bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const {
+			Eigen::Map<const Eigen::Quaterniond> q_last_curr(parameters[0]);
+			Eigen::Map<const Eigen::Vector3d> t_last_cur(parameters[4]);
+			Eigen::Vector3d lp = q_last_curr * curr_point + t_last_cur;
+			Eigen::Vector3d a = (lp - last_point_b).cross(lp - last_point_a);
+			Eigen::Vector3d b = last_point_a - last_point_b;
+			double b_norm = b.norm();
+			residuals[0] = a.norm() / b.norm();
+
+			if (jacobians != NULL) {
+				if (jacobians[0] != NULL) {
+					Eigen::Matrix3d skew_lp = skew(-lp);
+					Eigen::Matrix<double, 3, 6> dp_by_se3;
+					dp_by_se3.block<3, 3>(0, 0) = skew_lp;
+					dp_by_se3.block<3, 3>(0, 3).setIdentity();
+					Eigen::Matrix3d skew_b = skew(b);
+					Eigen::Map<Eigen::Matrix<double, 1, 7, Eigen::RowMajor> > J_se3(jacobians[0]);
+					J_se3.setZero();
+					J_se3.block<1,6>(0, 0) = 1 / b_norm * a.transpose() / a.norm() * skew_b * dp_by_se3;
+				}
+			}
+			return true;
+		}
+
+		Eigen::Vector3d curr_point;
+		Eigen::Vector3d last_point_a;
+		Eigen::Vector3d last_point_b;
+};
+
+class PlaneAnalyticCostFunction : public ceres::SizedCostFunction<1, 7> {
+	public:
+		PlaneAnalyticCostFunction(Eigen::Vector3d curr_point_, Eigen::Vector3d last_point_j_, Eigen::Vector3d last_point_l_, Eigen::Vector3d last_point_m_)
+			: curr_point(curr_point_), last_point_j(last_point_j_)， last_point_l(last_point_l_), last_point_m(last_point_m_) {
+			ljm_norm = (last_point_l - last_point_j).cross(last_point_m - last_point_j);
+			ljm_norm.normalize();
+		}
+		~PlaneAnalyticCostFunction() {}
+		bool Evaluate(double const *const *parameters, double *residuals, double **jacobians) const {
+			Eigen::Map<const Eigen::Quaterniond> q_last_curr(parameters[0]);
+			Eigen::Map<const Eigen::Vector3d> t_last_cur(parameters[4]);
+			Eigen::Vector3d lp = q_last_curr * curr_point + t_last_cur;
+
+			Eigen::Vector3d a = lp - last_point_j;
+			residuals[0] = (a * ljm_norm).norm();
+
+			if (jacobians != NULL) {
+				if (jacobians[0] != NULL) {
+					Eigen::Matrix3d skew_lp = skew(-lp);
+					Eigen::Matrix<double, 3, 6> dp_by_se3;
+					dp_by_se3.block<3, 3>(0, 0) = skew_lp;
+					dp_by_se3.block<3, 3>(0, 3).setIdentity();
+					Eigen::Map<Eigen::Matrix<double, 1, 7, Eigen::RowMajor> > J_se3(jacobians[0]);
+					J_se3.setZero();
+					J_se3.block<1,6>(0, 0) = (a * ljm_norm) / (a * ljm_norm).norm() * ljm_norm.transpose() * dp_by_se3;
+				}
+			}
+			return true;
+		}
+	Eigen::Vector3d curr_point, last_point_j, last_point_l, last_point_m;
+	Eigen::Vector3d ljm_norm;
+}
+
+Eigen::Matrix<double,3,3> skew(Eigen::Matrix<double,3,1>& mat_in){
+    Eigen::Matrix<double,3,3> skew_mat;
+    skew_mat.setZero();
+    skew_mat(0,1) = -mat_in(2);
+    skew_mat(0,2) =  mat_in(1);
+    skew_mat(1,2) = -mat_in(0);
+    skew_mat(1,0) =  mat_in(2);
+    skew_mat(2,0) = -mat_in(1);
+    skew_mat(2,1) =  mat_in(0);
+    return skew_mat;
+}
+
 struct LidarPlaneFactor
 {
 	LidarPlaneFactor(Eigen::Vector3d curr_point_, Eigen::Vector3d last_point_j_,

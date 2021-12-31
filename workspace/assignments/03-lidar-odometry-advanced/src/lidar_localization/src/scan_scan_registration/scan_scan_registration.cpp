@@ -59,6 +59,7 @@ bool ScanScanRegistration::InitKdTrees(void) {
     return true;
 }
 
+// 将input data转换到dq_所代表的坐标系中。应该是上一帧坐标系。
 bool ScanScanRegistration::TransformToStart(const CloudDataXYZI::POINT &input, CloudDataXYZI::POINT &output) {
     // interpolation ratio
     // double ratio = (input.intensity - int(input.intensity)) / config_.scan_period;

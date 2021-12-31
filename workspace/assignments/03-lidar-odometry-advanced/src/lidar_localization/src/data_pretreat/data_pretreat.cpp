@@ -123,7 +123,8 @@ bool DataPretreat::FilterByRange(
 
 bool DataPretreat::GetScanId(const float &angle, int &scan_id) {
     if (16 == config_.num_scans)
-    {
+    {   
+        // 从最下面的线束开始计算ID？
         scan_id = int((angle + 15) / 2 + 0.5);
 
         if (scan_id > (config_.num_scans - 1) || scan_id < 0)
@@ -192,6 +193,7 @@ bool DataPretreat::SortPointCloudByScan(const CloudDataXYZ::CLOUD &input_cloud, 
     }
 
     bool half_passed = false;
+    // TODO:将点云按照线束区分，每个线束的点云单独分在一个vector中，对于固态激光雷达这种怎么处理？
     std::vector<CloudDataXYZI::CLOUD> scan(config_.num_scans);
     for (int i = 0; i < input_size; i++)
     {
@@ -209,6 +211,7 @@ bool DataPretreat::SortPointCloudByScan(const CloudDataXYZ::CLOUD &input_cloud, 
         }
 
         // get current measurement yaw:
+        // TODO: figure out what happend here
         float curr_yaw = -atan2(point.y, point.x);
         if ( !half_passed )
         { 
@@ -249,6 +252,8 @@ bool DataPretreat::SortPointCloudByScan(const CloudDataXYZ::CLOUD &input_cloud, 
     // set start & end index for each scan:
     for (int i = 0; i < config_.num_scans; i++)
     { 
+        // TODO: neighborhood_size的含义？
+        // neighborhood_size这里应该代表求特整点时，向两边延伸查找的相邻点的个数。
         index_.scan.start[i] = output_cloud.size() + config_.neighborhood_size;
 
         output_cloud += scan[i];
@@ -317,13 +322,14 @@ bool DataPretreat::GetFeaturePoints(
     corner_less_sharp.reset(new CloudDataXYZI::CLOUD());
     surf_flat.reset(new CloudDataXYZI::CLOUD());
     surf_less_flat.reset(new CloudDataXYZI::CLOUD());
-
+    // 遍历每一个线束
     for (int i = 0; i < config_.num_scans; ++i)
     {
         if( index_.scan.end[i] - index_.scan.start[i] < config_.num_sectors)
             continue;
 
         CloudDataXYZI::CLOUD_PTR surf_less_flat_scan_ptr(new CloudDataXYZI::CLOUD());
+        // 遍历每个sector
         for (int j = 0; j < config_.num_sectors; ++j)
         {
             int sector_start = index_.scan.start[i] + j * (index_.scan.end[i] - index_.scan.start[i]) / config_.num_sectors; 
@@ -343,7 +349,7 @@ bool DataPretreat::GetFeaturePoints(
                 {
 
                     ++num_corners;
-
+                    // 前两个是sharp corner，前20个是less sharp corner
                     if (num_corners <= 2)
                     {                        
                         index_.point.label[ind] = FeaturePoint::CORNER_SHARP;
@@ -361,7 +367,7 @@ bool DataPretreat::GetFeaturePoints(
                     }
 
                     index_.point.picked[ind] = 1; 
-
+                    // 当一个特征点被选中以后，需要将该特征点计算所使用的所有相邻点标记为pick。
                     PickInNeighborhood(cloud, ind, 0.05f);
                 }
             }
