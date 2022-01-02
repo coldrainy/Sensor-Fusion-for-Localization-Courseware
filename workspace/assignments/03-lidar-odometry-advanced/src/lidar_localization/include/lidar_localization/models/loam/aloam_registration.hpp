@@ -119,6 +119,8 @@ private:
       double t[3] = {0.0, 0.0, 0.0};
     } param_;
 
+    double parameters[7] = {0, 0, 0, 1, 0, 0, 0};
+
     // problem:
     ceres::Problem problem_;
 };

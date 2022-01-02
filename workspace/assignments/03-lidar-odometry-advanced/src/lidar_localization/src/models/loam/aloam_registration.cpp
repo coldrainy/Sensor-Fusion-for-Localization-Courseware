@@ -40,10 +40,18 @@ CeresALOAMRegistration::CeresALOAMRegistration(
     //
     // config target variables:
     //
-    param_.q[0] = dq.x(); param_.q[1] = dq.y(); param_.q[2] = dq.z(); param_.q[3] = dq.w();
-    param_.t[0] = dt.x(); param_.t[1] = dt.y(); param_.t[2] = dt.z();
-    problem_.AddParameterBlock(param_.q, 4, config_.q_parameterization_ptr);
-    problem_.AddParameterBlock(param_.t, 3);
+    // param_.q[0] = dq.x(); param_.q[1] = dq.y(); param_.q[2] = dq.z(); param_.q[3] = dq.w();
+    // param_.t[0] = dt.x(); param_.t[1] = dt.y(); param_.t[2] = dt.z();
+    // problem_.AddParameterBlock(param_.q, 4, config_.q_parameterization_ptr);
+    // problem_.AddParameterBlock(param_.t, 3);
+    parameters[0] = dq.x();
+    parameters[1] = dq.y();
+    parameters[2] = dq.z();
+    parameters[3] = dq.w();
+    parameters[4] = dt.x();
+    parameters[5] = dt.y();
+    parameters[6] = dt.z();
+    problem_.AddParameterBlock(parameters, 7, new PoseSE3Parameterization());
 }
 
 CeresALOAMRegistration::~CeresALOAMRegistration() {
@@ -62,16 +70,25 @@ bool CeresALOAMRegistration::AddEdgeFactor(
     const Eigen::Vector3d &target_x, const Eigen::Vector3d &target_y,
     const double &ratio
 ) {
-    ceres::CostFunction *factor_edge = LidarEdgeFactor::Create(
-        source, 
-        target_x, target_y, 
-        ratio
-    );
+    // ceres::CostFunction *factor_edge = LidarEdgeFactor::Create(
+    //     source, 
+    //     target_x, target_y, 
+    //     ratio
+    // );
 
+    ceres::CostFunction *factor_edge = new EdgeAnalyticCostFunction(
+        source, 
+        target_x, target_y
+    );
+    // problem_.AddResidualBlock(
+    //     factor_edge, 
+    //     config_.loss_function_ptr, 
+    //     param_.q, param_.t
+    // );
     problem_.AddResidualBlock(
         factor_edge, 
         config_.loss_function_ptr, 
-        param_.q, param_.t
+        parameters
     );
 
     return true;
@@ -91,16 +108,27 @@ bool CeresALOAMRegistration::AddPlaneFactor(
     const Eigen::Vector3d &target_x, const Eigen::Vector3d &target_y, const Eigen::Vector3d &target_z,
     const double &ratio
 ) {
-    ceres::CostFunction *factor_plane = LidarPlaneFactor::Create(
+    // ceres::CostFunction *factor_plane = LidarPlaneFactor::Create(
+    //     source, 
+    //     target_x, target_y, target_z, 
+    //     ratio
+    // );
+
+    ceres::CostFunction *factor_plane = new PlaneAnalyticCostFunction(
         source, 
-        target_x, target_y, target_z, 
-        ratio
+        target_x, target_y, target_z
     );
+
+    // problem_.AddResidualBlock(
+    //     factor_plane,
+    //     config_.loss_function_ptr, 
+    //     param_.q, param_.t
+    // );
 
     problem_.AddResidualBlock(
         factor_plane,
         config_.loss_function_ptr, 
-        param_.q, param_.t
+        parameters
     );
 
     return true;
@@ -151,15 +179,24 @@ bool CeresALOAMRegistration::Optimize() {
   * @return true if success false otherwise
   */
 bool CeresALOAMRegistration::GetOptimizedRelativePose(Eigen::Quaterniond &dq, Eigen::Vector3d &dt) {
-    dq.x() = param_.q[0];
-    dq.y() = param_.q[1];
-    dq.z() = param_.q[2];
-    dq.w() = param_.q[3];
+    // dq.x() = param_.q[0];
+    // dq.y() = param_.q[1];
+    // dq.z() = param_.q[2];
+    // dq.w() = param_.q[3];
+    // dq.normalize();
+
+    // dt.x() = param_.t[0];
+    // dt.y() = param_.t[1];
+    // dt.z() = param_.t[2];
+    dq.x() = parameters[0];
+    dq.y() = parameters[1];
+    dq.z() = parameters[2];
+    dq.w() = parameters[3];
     dq.normalize();
 
-    dt.x() = param_.t[0];
-    dt.y() = param_.t[1];
-    dt.z() = param_.t[2];
+    dt.x() = parameters[4];
+    dt.y() = parameters[5];
+    dt.z() = parameters[6];
 
     return true;
 }
