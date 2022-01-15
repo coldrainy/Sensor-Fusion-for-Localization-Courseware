@@ -7,6 +7,9 @@
 #define LIDAR_LOCALIZATION_DATA_PRETREAT_DATA_PRETREAT_FLOW_HPP_
 
 #include <ros/ros.h>
+#include <yaml-cpp/yaml.h>
+#include <fstream>
+
 // subscriber
 #include "lidar_localization/subscriber/cloud_subscriber.hpp"
 #include "lidar_localization/subscriber/imu_subscriber.hpp"
@@ -20,6 +23,11 @@
 #include "lidar_localization/models/scan_adjust/distortion_adjust.hpp"
 
 namespace lidar_localization {
+enum PretreatStatus {
+  UNKNOWN = 0,
+  MAPPING = 1,
+  MATCHING = 2
+};
 class DataPretreatFlow {
   public:
     DataPretreatFlow(ros::NodeHandle& nh, std::string cloud_topic);
@@ -34,6 +42,7 @@ class DataPretreatFlow {
     bool ValidData();
     bool TransformData();
     bool PublishData();
+    bool InitWithConfig();
 
   private:
     // subscriber
@@ -61,6 +70,11 @@ class DataPretreatFlow {
     GNSSData current_gnss_data_;
 
     Eigen::Matrix4f gnss_pose_ = Eigen::Matrix4f::Identity();
+
+    PretreatStatus pretreat_status_ = PretreatStatus::UNKNOWN;
+    std::string init_path_ = "";
+    std::ofstream write_init_ofs_;
+    std::ifstream read_init_ofs_;
 };
 }
 

@@ -7,6 +7,7 @@
 
 #include "glog/logging.h"
 #include "lidar_localization/global_defination/global_defination.h"
+#include "lidar_localization/tools/file_manager.hpp"
 
 namespace lidar_localization {
 DataPretreatFlow::DataPretreatFlow(ros::NodeHandle& nh, std::string cloud_topic) {
@@ -27,6 +28,31 @@ DataPretreatFlow::DataPretreatFlow(ros::NodeHandle& nh, std::string cloud_topic)
 
     // motion compensation for lidar measurement:
     distortion_adjust_ptr_ = std::make_shared<DistortionAdjust>();
+
+    InitWithConfig();
+}
+
+bool DataPretreatFlow::InitWithConfig() {
+    std::string config_file_path = WORK_SPACE_PATH + "/config/mapping/data_pretreat.yaml";
+    YAML::Node config_node = YAML::LoadFile(config_file_path);
+
+    std::cout << "-----------------Init DataPretreat-------------------" << std::endl;
+    pretreat_status_ = static_cast<PretreatStatus>(config_node["pretreat_status"].as<int>());
+    std::string data_path = config_node["data_path"].as<std::string>();
+    if (data_path == "./") {
+        data_path = WORK_SPACE_PATH;
+    }
+    init_path_ = data_path + "/slam_data/init";
+    if (pretreat_status_ == PretreatStatus::MAPPING) {
+        if (!FileManager::InitDirectory(init_path_, "Init longitude and latitude"))
+            return false;
+        if (!FileManager::CreateFile(write_init_ofs_, init_path_ + "/init_lat_lon.txt"))
+            return false;
+    } else if (pretreat_status_ == PretreatStatus::MATCHING) {
+        read_init_ofs_.close();
+        read_init_ofs_.open(init_path_ + "/init_lat_lon.txt", std::ifstream::in);
+    }
+    return true;
 }
 
 bool DataPretreatFlow::Run() {
@@ -100,10 +126,36 @@ bool DataPretreatFlow::InitCalibration() {
 
 bool DataPretreatFlow::InitGNSS() {
     static bool gnss_inited = false;
-    if (!gnss_inited) {
-        GNSSData gnss_data = gnss_data_buff_.front();
-        gnss_data.InitOriginPosition();
-        gnss_inited = true;
+    // If the current mode is mapping, save the initial lat and lon
+    if (pretreat_status_ == PretreatStatus::MAPPING) {
+        if (!gnss_inited) {
+            GNSSData gnss_data = gnss_data_buff_.front();
+            gnss_data.InitOriginPosition();
+            write_init_ofs_ << gnss_data.origin_longitude << " "
+                      << gnss_data.origin_latitude << " "
+                      << gnss_data.origin_altitude <<std::endl;
+            gnss_inited = true;
+        }
+    } else if (pretreat_status_ == PretreatStatus::MATCHING) {
+        if (!gnss_inited) {
+            GNSSData gnss_data;
+            read_init_ofs_ >> gnss_data.longitude;
+            read_init_ofs_ >> gnss_data.latitude;
+            read_init_ofs_ >> gnss_data.altitude;
+            LOG(INFO) << "gnss_data: " << gnss_data.longitude <<" "
+                                      << gnss_data.latitude << " " 
+                                      <<gnss_data.altitude <<std::endl;
+            LOG(INFO) << "gnss_data: " << gnss_data.origin_longitude <<" "
+                            << gnss_data.origin_latitude << " " 
+                            <<gnss_data.origin_altitude <<std::endl;
+            gnss_data.InitOriginPosition();
+            LOG(INFO) << "gnss_data: " << gnss_data.origin_longitude <<" "
+                            << gnss_data.origin_latitude << " " 
+                            <<gnss_data.origin_altitude <<std::endl;
+            gnss_inited = true;
+        }
+    } else {
+        LOG(ERROR) << "Unkown mode!" <<std::endl;
     }
 
     return gnss_inited;
