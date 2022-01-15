@@ -110,7 +110,14 @@ bool MatchingFlow::UpdateMatching() {
         //
         // Hints: You can use SetGNSSPose & SetScanContextPose from matching.hpp
         //
-        matching_ptr_->SetGNSSPose(current_gnss_data_.pose);
+        if (matching_ptr_->SetGNSSPose(current_gnss_data_.pose)) {
+            LOG(INFO) << "Initialized by GNSS" <<std::endl;
+        } else if(matching_ptr_->SetScanContextPose(current_cloud_data_)){
+            LOG(INFO) << "Initialized by ScanContext" <<std::endl;
+        } else {
+            LOG(INFO) << "Initialized failed!" <<std::endl;
+        }
+
         // naive implementation:
         // Eigen::Matrix4f init_pose = Eigen::Matrix4f::Identity();
         
