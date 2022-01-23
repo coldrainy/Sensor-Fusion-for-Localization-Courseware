@@ -87,19 +87,26 @@ public:
   /** @brief Basic "default" constructor: without any parameter, it initilizes the calibration parameter with 
    *         default values (zero scaling factors and biases, identity misalignment matrix)
    */
-  CalibratedTriad_( const _T &mis_yz = _T(0), const _T &mis_zy = _T(0), const _T &mis_zx = _T(0), 
-                    const _T &mis_xz = _T(0), const _T &mis_xy = _T(0), const _T &mis_yx = _T(0), 
+  CalibratedTriad_( const _T &mis_xy = _T(0), const _T &mis_xz = _T(0), const _T &mis_yz = _T(0), 
+                    const _T &mis_yx = _T(0), const _T &mis_zx = _T(0), const _T &mis_zy = _T(0), 
                     const _T &s_x = _T(1),    const _T &s_y = _T(1),    const _T &s_z = _T(1), 
                     const _T &b_x = _T(0),    const _T &b_y = _T(0),    const _T &b_z  = _T(0) );
  
   ~CalibratedTriad_(){};
                
-  inline _T misYZ() const { return -mis_mat_(0,1); };
-  inline _T misZY() const { return mis_mat_(0,2); };
-  inline _T misZX() const { return -mis_mat_(1,2); };
-  inline _T misXZ() const { return mis_mat_(1,0); };
-  inline _T misXY() const { return -mis_mat_(2,0); };
-  inline _T misYX() const { return mis_mat_(2,1); };
+  // inline _T misYZ() const { return -mis_mat_(0,1); };
+  // inline _T misZY() const { return mis_mat_(0,2); };
+  // inline _T misZX() const { return -mis_mat_(1,2); };
+  // inline _T misXZ() const { return mis_mat_(1,0); };
+  // inline _T misXY() const { return -mis_mat_(2,0); };
+  // inline _T misYX() const { return mis_mat_(2,1); };
+
+  inline _T misXY() const { return mis_mat_(0,1); };
+  inline _T misXZ() const { return mis_mat_(0,2); };
+  inline _T misYZ() const { return mis_mat_(1,2); };
+  inline _T misYX() const { return mis_mat_(1,0); };
+  inline _T misZX() const { return mis_mat_(2,0); };
+  inline _T misZY() const { return mis_mat_(2,1); };
 
   inline _T scaleX() const { return scale_mat_(0,0); };
   inline _T scaleY() const { return scale_mat_(1,1); };
@@ -163,6 +170,33 @@ public:
   inline Eigen::Matrix< _T, 3 , 1> unbiasNormalize( const Eigen::Matrix< _T, 3 , 1> &raw_data ) const
   {
     return ms_mat_*(raw_data - bias_vec_); 
+  };
+
+  inline Eigen::Matrix< _T, 3 , 3> getPartialS(const Eigen::Matrix< _T, 3 , 1> &raw_data) const
+  {
+    Eigen::Matrix< _T, 3 , 3> partial_s;
+    partial_s << 0, 0, 0,
+                 -1/scale_mat_(0, 0)*(raw_data - bias_vec_)(0, 0), 0, 0,
+                 0, -1/scale_mat_(0, 0)*(raw_data - bias_vec_)(0, 0), -1/scale_mat_(1,1)*(raw_data - bias_vec_)(1, 1);
+    return partial_s;
+  };
+
+  inline Eigen::Matrix< _T, 3 , 3> getPartialK(const Eigen::Matrix< _T, 3 , 1> &raw_data) const
+  {
+    Eigen::Matrix< _T, 3 , 3> partial_k;
+    partial_k << -1/(scale_mat_(0, 0)*scale_mat_(0, 0))*(raw_data - bias_vec_)(0, 0), 0, 0,
+                 1/(scale_mat_(0, 0)*scale_mat_(0, 0))*mis_mat_(1,0)*(raw_data - bias_vec_)(0, 0), -1/(scale_mat_(1, 1)*scale_mat_(1, 1))*(raw_data - bias_vec_)(1, 0), 0,
+                 1/(scale_mat_(0, 0)*scale_mat_(0, 0))*mis_mat_(2,0)*(raw_data - bias_vec_)(0, 0), 1/(scale_mat_(1, 1)*scale_mat_(1, 1))*mis_mat_(2,1)*(raw_data - bias_vec_)(1, 0), -1/(scale_mat_(2, 2)*scale_mat_(2, 2))*(raw_data - bias_vec_)(2, 0);
+    return partial_k;
+  };
+
+  inline Eigen::Matrix< _T, 3 , 3> getPartialB(const Eigen::Matrix< _T, 3 , 1> &raw_data) const
+  {
+    Eigen::Matrix< _T, 3 , 3> partial_b;
+    partial_b << -1/scale_mat_(0, 0), 0, 0,
+                 1/scale_mat_(0, 0)*mis_mat_(1,0), -1/scale_mat_(1, 1), 0,
+                 1/scale_mat_(0, 0)*mis_mat_(2,0), 1/scale_mat_(1, 1)*mis_mat_(2,1), -1/scale_mat_(2,2);
+    return partial_b;
   };
   
   /** @brief Normalize a raw data X by removing the biases and 
@@ -365,14 +399,17 @@ typedef MultiPosCalibration_<double> MultiPosCalibration;
 /* Implementations */
 
 template <typename _T> 
-  imu_tk::CalibratedTriad_<_T>::CalibratedTriad_( const _T &mis_yz, const _T &mis_zy, const _T &mis_zx, 
-                                                const _T &mis_xz, const _T &mis_xy, const _T &mis_yx, 
+  imu_tk::CalibratedTriad_<_T>::CalibratedTriad_( const _T &mis_xy, const _T &mis_xz, const _T &mis_yz, 
+                                                const _T &mis_yx, const _T &mis_zx, const _T &mis_zy, 
                                                 const _T &s_x, const _T &s_y, const _T &s_z, 
                                                 const _T &b_x, const _T &b_y, const _T &b_z )
 {
-  mis_mat_ <<  _T(1)   , -mis_yz  ,  mis_zy  ,
-                mis_xz ,  _T(1)   , -mis_zx  ,  
-               -mis_xy ,  mis_yx  ,  _T(1)   ;
+  // mis_mat_ <<  _T(1)   , -mis_yz  ,  mis_zy  ,
+  //               mis_xz ,  _T(1)   , -mis_zx  ,  
+  //              -mis_xy ,  mis_yx  ,  _T(1)   ;
+  mis_mat_ <<  _T(0)   , mis_xy  ,  mis_xz  ,
+                mis_yx ,  _T(0)   , mis_yz  ,  
+               mis_zx ,  mis_zy  ,  _T(0)   ;
               
   scale_mat_ <<   s_x  ,   _T(0)  ,  _T(0) ,
                  _T(0) ,    s_y   ,  _T(0) ,  
@@ -430,7 +467,11 @@ template <typename _T>
 
 template <typename _T> void imu_tk::CalibratedTriad_<_T>::update()
 {
-  ms_mat_ = mis_mat_*scale_mat_;
+  Eigen::Matrix< _T, 3 , 3> scale_mat_inverse (Eigen::Matrix< _T, 3 , 3>::Zero());
+  scale_mat_inverse(0,0) = _T(1.0/scale_mat_(0,0)); 
+  scale_mat_inverse(1,1) = _T(1.0/scale_mat_(1,1));
+  scale_mat_inverse(2,2) = _T(1.0/scale_mat_(2,2)); 
+  ms_mat_ = (Eigen::Matrix< _T, 3 , 3>::Identity() - mis_mat_) * scale_mat_inverse;
 }
 
 template <typename _T> std::ostream& imu_tk::operator<<(std::ostream& os, 

@@ -105,12 +105,58 @@ template <typename _T1> struct MultiPosAccResidual
 
     return true;
   }
-  
-  static ceres::CostFunction* Create ( const _T1 &g_mag, const Eigen::Matrix< _T1, 3 , 1> &sample )
-  {
-    return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 1, 9 > (
-               new MultiPosAccResidual<_T1>( g_mag, sample ) ) );
-  }
+  const _T1 g_mag_;
+  const Eigen::Matrix< _T1, 3 , 1> sample_;
+};
+
+template <typename _T1> 
+class MultiPosAccAnalyticResidual : public ceres::SizedCostFunction<1, 9>
+{
+  public:
+    MultiPosAccAnalyticResidual( 
+      const _T1 &g_mag, 
+      const Eigen::Matrix< _T1, 3 , 1> &sample 
+    ) : g_mag_(g_mag), sample_(sample){}
+
+    bool Evaluate(double const *const *params, double *residuals, double **jacobians) const {
+      CalibratedTriad_<double> calib_triad( 
+        double(0), double(0), double(0),
+        // mis_yx, mis_zx, mis_zy:
+        params[0][0], params[0][1], params[0][2],
+        //    s_x,    s_y,    s_z:
+        params[0][3], params[0][4], params[0][5], 
+        //    b_x,    b_y,    b_z: 
+        params[0][6], params[0][7], params[0][8] 
+      );
+      Eigen::Matrix<double, 3, 1> raw_samp( 
+        double(sample_(0)), 
+        double(sample_(1)), 
+        double(sample_(2)) 
+      );
+      // apply undistortion transform:
+      Eigen::Matrix< double, 3 , 1> calib_samp = calib_triad.unbiasNormalize( raw_samp );
+      residuals[0] = double (g_mag_) * double (g_mag_) - calib_samp.norm() * calib_samp.norm();
+      Eigen::Matrix< double, 3 , 3> partial_s = calib_triad.getPartialS(raw_samp);
+      Eigen::Matrix< double, 3 , 3> partial_k = calib_triad.getPartialK(raw_samp);
+      Eigen::Matrix< double, 3 , 3> partial_b = calib_triad.getPartialB(raw_samp);
+      if (jacobians != NULL) {
+        if (jacobians[0] != NULL) {
+          Eigen::Map<Eigen::Matrix<double, 1, 9, Eigen::RowMajor> > J_se3(jacobians[0]);
+          J_se3.setZero();
+          J_se3.block<1,3>(0, 0) = -2 * calib_samp.transpose() * partial_s;
+          J_se3.block<1,3>(0, 3) = -2 * calib_samp.transpose() * partial_k;
+          J_se3.block<1,3>(0, 6) = -2 * calib_samp.transpose() * partial_b;
+        }
+      }
+      return true;
+    }
+    
+    static ceres::CostFunction* Create ( const _T1 &g_mag, const Eigen::Matrix< _T1, 3 , 1> &sample )
+    {
+      // return ( new ceres::AutoDiffCostFunction< MultiPosAccResidual, 1, 9 > (
+      //            new MultiPosAccResidual<_T1>( g_mag, sample ) ) );
+      return ( new MultiPosAccAnalyticResidual<_T1>( g_mag, sample  ) );
+    }
   
   const _T1 g_mag_;
   const Eigen::Matrix< _T1, 3 , 1> sample_;
@@ -226,9 +272,13 @@ bool MultiPosCalibration_<_T>::calibrateAcc(
     // acc_calib_params[1] = init_acc_calib_.misZY();
     // acc_calib_params[2] = init_acc_calib_.misZX();
 
-    acc_calib_params[0] = init_acc_calib_.misXZ();
-    acc_calib_params[1] = init_acc_calib_.misXY();
-    acc_calib_params[2] = init_acc_calib_.misYX();
+    // acc_calib_params[0] = init_acc_calib_.misXZ();
+    // acc_calib_params[1] = init_acc_calib_.misXY();
+    // acc_calib_params[2] = init_acc_calib_.misYX();
+
+    acc_calib_params[0] = init_acc_calib_.misYX();
+    acc_calib_params[1] = init_acc_calib_.misZX();
+    acc_calib_params[2] = init_acc_calib_.misZY();
     
     acc_calib_params[3] = init_acc_calib_.scaleX();
     acc_calib_params[4] = init_acc_calib_.scaleY();
@@ -261,7 +311,10 @@ bool MultiPosCalibration_<_T>::calibrateAcc(
     ceres::Problem problem;
     for( int i = 0; i < static_samples.size(); i++)
     {
-      ceres::CostFunction* cost_function = MultiPosAccResidual<_T>::Create ( 
+      // ceres::CostFunction* cost_function = MultiPosAccResidual<_T>::Create ( 
+      //   g_mag_, static_samples[i].data() 
+      // );
+      ceres::CostFunction* cost_function = MultiPosAccAnalyticResidual<_T>::Create ( 
         g_mag_, static_samples[i].data() 
       );
 
