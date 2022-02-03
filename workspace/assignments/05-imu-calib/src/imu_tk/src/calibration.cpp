@@ -136,6 +136,12 @@ class MultiPosAccAnalyticResidual : public ceres::SizedCostFunction<1, 9>
       // apply undistortion transform:
       Eigen::Matrix< double, 3 , 1> calib_samp = calib_triad.unbiasNormalize( raw_samp );
       residuals[0] = double (g_mag_) * double (g_mag_) - calib_samp.norm() * calib_samp.norm();
+      std::cout<<"raw_samp:"<<raw_samp.transpose()<<std::endl;
+      std::cout<<"calib_samp:"<<calib_samp.transpose()<<std::endl;
+      std::cout<<" g_mag_:"<<g_mag_;
+      std::cout<<" calib_samp.norm():"<<calib_samp.norm();
+      std::cout<<" residuals[0]:"<<residuals[0];
+      std::cout<<std::endl;
       Eigen::Matrix< double, 3 , 3> partial_s = calib_triad.getPartialS(raw_samp);
       Eigen::Matrix< double, 3 , 3> partial_k = calib_triad.getPartialK(raw_samp);
       Eigen::Matrix< double, 3 , 3> partial_b = calib_triad.getPartialB(raw_samp);

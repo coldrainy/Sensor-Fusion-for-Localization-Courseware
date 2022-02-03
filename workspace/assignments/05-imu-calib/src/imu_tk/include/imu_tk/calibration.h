@@ -184,18 +184,18 @@ public:
   inline Eigen::Matrix< _T, 3 , 3> getPartialK(const Eigen::Matrix< _T, 3 , 1> &raw_data) const
   {
     Eigen::Matrix< _T, 3 , 3> partial_k;
-    partial_k << -1/(scale_mat_(0, 0)*scale_mat_(0, 0))*(raw_data - bias_vec_)(0, 0), 0, 0,
-                 1/(scale_mat_(0, 0)*scale_mat_(0, 0))*mis_mat_(1,0)*(raw_data - bias_vec_)(0, 0), -1/(scale_mat_(1, 1)*scale_mat_(1, 1))*(raw_data - bias_vec_)(1, 0), 0,
-                 1/(scale_mat_(0, 0)*scale_mat_(0, 0))*mis_mat_(2,0)*(raw_data - bias_vec_)(0, 0), 1/(scale_mat_(1, 1)*scale_mat_(1, 1))*mis_mat_(2,1)*(raw_data - bias_vec_)(1, 0), -1/(scale_mat_(2, 2)*scale_mat_(2, 2))*(raw_data - bias_vec_)(2, 0);
+    partial_k << -1.0/(scale_mat_(0, 0)*scale_mat_(0, 0))*(raw_data - bias_vec_)(0, 0), 0.0, 0.0,
+                 1.0/(scale_mat_(0, 0)*scale_mat_(0, 0))*mis_mat_(1,0)*(raw_data - bias_vec_)(0, 0), -1.0/(scale_mat_(1, 1)*scale_mat_(1, 1))*(raw_data - bias_vec_)(1, 0), 0.0,
+                 1.0/(scale_mat_(0, 0)*scale_mat_(0, 0))*mis_mat_(2,0)*(raw_data - bias_vec_)(0, 0), 1.0/(scale_mat_(1, 1)*scale_mat_(1, 1))*mis_mat_(2,1)*(raw_data - bias_vec_)(1, 0), -1.0/(scale_mat_(2, 2)*scale_mat_(2, 2))*(raw_data - bias_vec_)(2, 0);
     return partial_k;
   };
 
   inline Eigen::Matrix< _T, 3 , 3> getPartialB(const Eigen::Matrix< _T, 3 , 1> &raw_data) const
   {
     Eigen::Matrix< _T, 3 , 3> partial_b;
-    partial_b << -1/scale_mat_(0, 0), 0, 0,
-                 1/scale_mat_(0, 0)*mis_mat_(1,0), -1/scale_mat_(1, 1), 0,
-                 1/scale_mat_(0, 0)*mis_mat_(2,0), 1/scale_mat_(1, 1)*mis_mat_(2,1), -1/scale_mat_(2,2);
+    partial_b << -1.0/scale_mat_(0, 0), 0, 0,
+                 1.0/scale_mat_(0, 0)*mis_mat_(1,0), -1.0/scale_mat_(1, 1), 0,
+                 1.0/scale_mat_(0, 0)*mis_mat_(2,0), 1.0/scale_mat_(1, 1)*mis_mat_(2,1), -1.0/scale_mat_(2,2);
     return partial_b;
   };
   
