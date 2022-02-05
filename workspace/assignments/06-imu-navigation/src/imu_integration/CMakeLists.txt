@@ -136,6 +136,12 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
+# Evaluater
+add_executable(evaluate_node src/evaluator/evaluate.cpp)
+target_link_libraries(evaluate_node
+  ${catkin_LIBRARIES}
+)
+
 ## Utils
 file(GLOB_RECURSE UTILS_SRCS "src/subscriber/*.cpp")
 add_library(utils
@@ -214,6 +220,7 @@ target_link_libraries(generator_node
 install(TARGETS 
       generator_node
       estimator_node
+      evaluate_node
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

@@ -15,5 +15,10 @@
         <!-- custom configuration -->
     </node>
 
-     <node name="rviz" pkg="rviz" type="rviz" args="-d $(find imu_integration)/rviz/imu_integration.rviz" required="true" /> 
+    <node pkg="imu_integration" type="evaluate_node" name="evaluate_node" clear_params="true">
+    </node>
+
+    <!-- <node pkg="rosbag" type="play" name="playe" output="screen" args="/workspace/data/gnss_ins_sim/test/data.bag" /> -->
+
+    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find imu_integration)/rviz/imu_integration.rviz" required="true" /> 
 </launch>
