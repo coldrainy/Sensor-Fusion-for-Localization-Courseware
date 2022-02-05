@@ -125,20 +125,63 @@ bool Activity::UpdatePose(void) {
         //
         // TODO: implement your estimation here
         //
-        // get deltas:
+        // MidValueIntegration();
+        EulerIntegration();
 
-        // update orientation:
-
-        // get velocity delta:
-
-        // update position:
-
-        // move forward -- 
-        // NOTE: this is NOT fixed. you should update your buffer according to the method of your choice:
-        imu_data_buff_.pop_front();
     }
     
     return true;
+}
+
+bool Activity::EulerIntegration() {
+    IMUData imu_data_start = imu_data_buff_[0];
+    IMUData imu_data_end = imu_data_buff_[1];    
+    double dt = imu_data_end.time - imu_data_start.time;
+    Eigen::Vector3d omega_last = GetUnbiasedAngularVel(imu_data_start.angular_velocity);
+    Eigen::Vector3d theta_vec = omega_last*dt;
+    double theta = theta_vec.norm();
+    Eigen::Matrix3d theta_hat;
+    theta_hat << 0.0, -theta_vec(2), theta_vec(1),
+                    theta_vec(2), 0.0, -theta_vec(0),
+                    -theta_vec(1), theta_vec(0), 0.0;
+    Eigen::Matrix3d delta_R = Eigen::Matrix3d::Identity() + 
+        std::sin(theta)/theta * theta_hat + 
+        (1-std::cos(theta))/(theta*theta)*theta_hat*theta_hat;
+    Eigen::Matrix3d R_cur = pose_.block<3, 3>(0, 0) * delta_R;
+    Eigen::Vector3d a1 = GetUnbiasedLinearAcc(imu_data_start.linear_acceleration, pose_.block<3, 3>(0, 0));
+    Eigen::Vector3d delta_vel = a1*dt;
+    pose_.block<3, 1>(0, 3) = pose_.block<3, 1>(0, 3) + vel_*dt + 0.5*a1*dt*dt;
+    pose_.block<3, 3>(0, 0) = R_cur;
+    vel_ = vel_ + delta_vel;
+    imu_data_buff_.pop_front();
+}
+bool Activity::MidValueIntegration() {
+    IMUData imu_data_start = imu_data_buff_[0];
+    IMUData imu_data_end = imu_data_buff_[1];
+    double dt = imu_data_end.time - imu_data_start.time;
+
+    Eigen::Vector3d omega_1 = GetUnbiasedAngularVel(imu_data_start.angular_velocity);
+    Eigen::Vector3d omega_2 = GetUnbiasedAngularVel(imu_data_end.angular_velocity);
+    Eigen::Vector3d theta_vec = (omega_1 + omega_2) * 0.5 * dt;
+    double theta = theta_vec.norm();
+    
+    Eigen::Matrix3d theta_hat;
+    theta_hat << 0.0, -theta_vec(2), theta_vec(1),
+                    theta_vec(2), 0.0, -theta_vec(0),
+                    -theta_vec(1), theta_vec(0), 0.0;
+    Eigen::Matrix3d delta_R = Eigen::Matrix3d::Identity() + 
+        std::sin(theta)/theta * theta_hat + 
+        (1-std::cos(theta))/(theta*theta)*theta_hat*theta_hat;
+    Eigen::Matrix3d R_cur = pose_.block<3, 3>(0, 0) * delta_R;
+
+    Eigen::Vector3d a1 = GetUnbiasedLinearAcc(imu_data_start.linear_acceleration, pose_.block<3, 3>(0, 0));
+    Eigen::Vector3d a2 = GetUnbiasedLinearAcc(imu_data_end.linear_acceleration, R_cur);
+    Eigen::Vector3d delta_vel = (a1 + a2)*0.5*dt;
+    // update position:
+    pose_.block<3, 1>(0, 3) = pose_.block<3, 1>(0, 3) + (vel_ + vel_ + delta_vel)*0.5*dt;
+    pose_.block<3, 3>(0, 0) = R_cur;
+    vel_ = vel_ + delta_vel;
+    imu_data_buff_.pop_front();
 }
 
 bool Activity::PublishPose() {

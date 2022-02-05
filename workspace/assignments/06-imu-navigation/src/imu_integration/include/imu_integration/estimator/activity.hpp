@@ -36,6 +36,10 @@ class Activity {
     bool HasData(void);
     bool UpdatePose(void);
     bool PublishPose(void);
+    // mid-value integration
+    bool MidValueIntegration();
+    // euler integration
+    bool EulerIntegration();
 
     // utils:
     /**
