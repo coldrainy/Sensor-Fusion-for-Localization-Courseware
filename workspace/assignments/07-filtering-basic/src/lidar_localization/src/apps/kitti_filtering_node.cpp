@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 
     // save odometry estimations for evo evaluation:
     if (_need_save_odometry && kitti_filtering_flow_ptr->SaveOdometry()) {
-      _need_save_odometry = false;
+      // _need_save_odometry = false;
     }
 
     rate.sleep();
