@@ -32,6 +32,9 @@ void GNSSData::UpdateXYZ() {
     }
 
     geo_converter.Forward(latitude, longitude, altitude, local_E, local_N, local_U);
+    local_E += 4.37544;
+    local_N += 8.58635;
+    local_U += 1.60165;
 }
 
 void GNSSData::Reverse(
