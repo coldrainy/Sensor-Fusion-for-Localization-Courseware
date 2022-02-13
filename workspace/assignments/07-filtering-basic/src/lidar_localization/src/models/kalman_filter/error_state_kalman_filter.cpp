@@ -85,8 +85,8 @@ ErrorStateKalmanFilter::ErrorStateKalmanFilter(const YAML::Node &node) {
   // c. process noise:
   Q_.block<3, 3>(kIndexNoiseAccel, kIndexNoiseAccel) = COV.PROCESS.ACCEL * Eigen::Matrix3d::Identity();
   Q_.block<3, 3>(kIndexNoiseGyro, kIndexNoiseGyro) = COV.PROCESS.GYRO * Eigen::Matrix3d::Identity();
-  Q_.block<3, 3>(kIndexNoiseBiasAccel, kIndexNoiseBiasAccel) = COV.PROCESS.BIAS_ACCEL * Eigen::Matrix3d::Identity();
-  Q_.block<3, 3>(kIndexNoiseBiasGyro, kIndexNoiseBiasGyro) = COV.PROCESS.BIAS_GYRO * Eigen::Matrix3d::Identity();
+  // Q_.block<3, 3>(kIndexNoiseBiasAccel, kIndexNoiseBiasAccel) = COV.PROCESS.BIAS_ACCEL * Eigen::Matrix3d::Identity();
+  // Q_.block<3, 3>(kIndexNoiseBiasGyro, kIndexNoiseBiasGyro) = COV.PROCESS.BIAS_GYRO * Eigen::Matrix3d::Identity();
 
   // d. measurement noise:
   RPose_.block<3, 3>(0, 0) = COV.MEASUREMENT.POSE.POSI * Eigen::Matrix3d::Identity();
@@ -97,8 +97,8 @@ ErrorStateKalmanFilter::ErrorStateKalmanFilter(const YAML::Node &node) {
   F_.block<3, 3>(kIndexErrorOri, kIndexErrorGyro) = -Eigen::Matrix3d::Identity();
 
   B_.block<3, 3>(kIndexErrorOri, kIndexNoiseGyro) = Eigen::Matrix3d::Identity();
-  B_.block<3, 3>(kIndexErrorAccel, kIndexNoiseBiasAccel) = Eigen::Matrix3d::Identity();
-  B_.block<3, 3>(kIndexErrorGyro, kIndexNoiseBiasGyro) = Eigen::Matrix3d::Identity();
+  // B_.block<3, 3>(kIndexErrorAccel, kIndexNoiseBiasAccel) = Eigen::Matrix3d::Identity();
+  // B_.block<3, 3>(kIndexErrorGyro, kIndexNoiseBiasGyro) = Eigen::Matrix3d::Identity();
 
   // f. measurement equation:
   GPose_.block<3, 3>(0, kIndexErrorPos) = Eigen::Matrix3d::Identity();
@@ -538,8 +538,8 @@ void ErrorStateKalmanFilter::UpdateErrorEstimation(
   MatrixB B_d = MatrixB::Zero();
   B_d.block<3, 3>(3, 0) = B_.block<3, 3>(3, 0) * T;
   B_d.block<3, 3>(6, 3) = B_.block<3, 3>(6, 3) * T;
-  B_d.block<3, 3>(9, 6) = B_.block<3, 3>(9, 6) * sqrt(T);
-  B_d.block<3, 3>(12, 9) = B_.block<3, 3>(12, 9) * sqrt(T);
+  // B_d.block<3, 3>(9, 6) = B_.block<3, 3>(9, 6) * sqrt(T);
+  // B_d.block<3, 3>(12, 9) = B_.block<3, 3>(12, 9) * sqrt(T);
   // TODO: perform Kalman prediction
   X_ = F_d * X_;
   P_ = F_d * P_ * F_d.transpose() + B_d * Q_ * B_d.transpose();  
