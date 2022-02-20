@@ -25,7 +25,9 @@ registration_method: NDT   # 选择点云匹配方法，目前支持：NDT
 fusion_method: error_state_kalman_filter
 # select fusion strategy for IMU-GNSS-Odo-Mag, available methods are:
 #     1. pose_velocity
-fusion_strategy: pose_velocity
+# fusion_strategy: pose_velocity
+# fusion_strategy: pose
+fusion_strategy: posi_vel
 
 # 各配置选项对应参数
 ## a. point cloud filtering:

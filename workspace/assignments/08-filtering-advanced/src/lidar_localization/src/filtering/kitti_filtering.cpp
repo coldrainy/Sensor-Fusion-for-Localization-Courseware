@@ -282,6 +282,8 @@ bool KITTIFiltering::InitRegistration(
 bool KITTIFiltering::InitFusion(const YAML::Node& config_node) {
     // set up fusion strategy:
     CONFIG.FUSION_STRATEGY_ID["pose_velocity"] = KalmanFilter::MeasurementType::POSE_VEL;
+    CONFIG.FUSION_STRATEGY_ID["pose"] = KalmanFilter::MeasurementType::POSE;
+    CONFIG.FUSION_STRATEGY_ID["posi_vel"] = KalmanFilter::MeasurementType::POSI_VEL;
 
     std::string fusion_strategy = config_node["fusion_strategy"].as<std::string>();
 

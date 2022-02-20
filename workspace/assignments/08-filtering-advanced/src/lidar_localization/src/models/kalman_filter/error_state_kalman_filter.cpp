@@ -619,12 +619,22 @@ void ErrorStateKalmanFilter::CorrectErrorEstimationPoseVel(
     //
     // TODO: set measurement:
     //
-
+    Eigen::VectorXd delta_p = pose_.block<3,1>(0,3) - T_nb.block<3,1>(0,3);
+    Eigen::MatrixXd delta_R = T_nb.block<3,3>(0,0).transpose() * pose_.block<3,3>(0,0);
+    Eigen::VectorXd d_theta = Sophus::SO3d::vee(delta_R - Eigen::Matrix3d::Identity());
+    Eigen::VectorXd d_vel = pose_.block<3,3>(0,0).transpose() * vel_ - v_b;
+    YPoseVel_.block<3, 1>(0, 0) = delta_p;
+    YPoseVel_.block<3, 1>(3, 0) = d_theta;
+    YPoseVel_.block<3, 1>(6, 0) = d_vel;
+    Y = YPoseVel_;
     // set measurement equation:
-
+    GPoseVel_.block<3, 3>(6, 3) = pose_.block<3,3>(0,0).transpose();
+    GPoseVel_.block<3, 3>(6, 6) = Sophus::SO3d::hat(v_b);
+    G = GPoseVel_;
     //
     // TODO: set Kalman gain:
     //
+    K = P_ * G.transpose() * (G*P_*G.transpose() + CPoseVel_*RPoseVel_*CPoseVel_.transpose()).inverse();
 }
 
 /**
@@ -638,10 +648,17 @@ void ErrorStateKalmanFilter::CorrectErrorEstimationPosiVel(
     Eigen::VectorXd &Y, Eigen::MatrixXd &G, Eigen::MatrixXd &K
 ) {
     // parse measurement:
-
+    Eigen::VectorXd delta_p = pose_.block<3,1>(0,3) - T_nb.block<3,1>(0,3);
+    Eigen::VectorXd d_vel = pose_.block<3,3>(0,0).transpose() * vel_ - v_b;
+    YPosiVel_.block<3, 1>(0, 0) = delta_p;
+    YPosiVel_.block<3, 1>(3, 0) = d_vel;
+    Y = YPosiVel_;
     // set measurement equation:
-
+    GPosiVel_.block<3, 3>(3, 3) = pose_.block<3,3>(0,0).transpose();
+    GPosiVel_.block<3, 3>(3, 6) = Sophus::SO3d::hat(v_b);
+    G = GPosiVel_;
     // set Kalman gain:
+    K = P_ * G.transpose() * (G*P_*G.transpose() + CPosiVel_*RPosiVel_*CPosiVel_.transpose()).inverse();
 }
 
 /**
@@ -668,11 +685,19 @@ void ErrorStateKalmanFilter::CorrectErrorEstimation(
     //
     // TODO: register new correction logic here:
     //
+    std::cout<<"measurement:"<<std::endl;
+    std::cout<<"v_b: "<<measurement.v_b.transpose()<<" w_b: " <<measurement.w_b.transpose()<<std::endl;
+
+    CorrectErrorEstimationPoseVel(
+      measurement.T_nb, measurement.v_b, measurement.w_b, Y, G, K);
     break;
   case MeasurementType::POSI_VEL:
     //
     // TODO: register new correction logic here:
     //
+    std::cout<<"measurement:"<<std::endl;
+    std::cout<<"v_b: "<<measurement.v_b.transpose()<<"\nw_b: " <<measurement.w_b.transpose()<<std::endl;
+    CorrectErrorEstimationPosiVel(measurement.T_nb, measurement.v_b, measurement.w_b, Y, G, K);
     break;
   default:
     break;
@@ -681,15 +706,15 @@ void ErrorStateKalmanFilter::CorrectErrorEstimation(
   //
   // TODO: perform Kalman correct:
   //
-  // std::cout << "---------------start_correct-----------------" <<std::endl;
-  // std::cout << "Y:" << Y.transpose() <<std::endl;
-  // std::cout << "G*X_:" << (G*X_).transpose() << std::endl;
-  // std::cout << "Y - G*X_:" << (Y - G*X_).transpose() << std::endl;
-  // std::cout << "before X_:" << X_.transpose()<< std::endl;
+  std::cout << "---------------start_correct-----------------" <<std::endl;
+  std::cout << "Y:" << Y.transpose() <<std::endl;
+  std::cout << "G*X_:" << (G*X_).transpose() << std::endl;
+  std::cout << "Y - G*X_:" << (Y - G*X_).transpose() << std::endl;
+  std::cout << "before X_:" << X_.transpose()<< std::endl;
   X_ = X_ + K*(Y - G*X_);
-  // std::cout << "after X_:" << X_.transpose()<< std::endl;
+  std::cout << "after X_:" << X_.transpose()<< std::endl;
   P_ = (MatrixP::Identity() - K*G)*P_;
-  // std::cout << "CorrectErrorEstimation P_:" << "\n" <<P_.transpose()<< std::endl;
+  std::cout << "CorrectErrorEstimation P_:" << "\n" <<P_.transpose()<< std::endl;
 }
 
 /**
@@ -768,7 +793,7 @@ void ErrorStateKalmanFilter::ResetCovariance(void) {
       COV.PRIOR.EPSILON * Eigen::Matrix3d::Identity();
   P_.block<3, 3>(kIndexErrorAccel, kIndexErrorAccel) =
       COV.PRIOR.DELTA * Eigen::Matrix3d::Identity();
-  // std::cout<<"Init P_:"<<"\n"<<P_<<std::endl;
+  std::cout<<"Init P_:"<<"\n"<<P_<<std::endl;
 }
 
 /**
