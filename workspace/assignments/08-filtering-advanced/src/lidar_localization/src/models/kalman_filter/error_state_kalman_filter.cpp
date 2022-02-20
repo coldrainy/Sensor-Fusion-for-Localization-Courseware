@@ -525,14 +525,10 @@ void ErrorStateKalmanFilter::SetProcessEquation(const Eigen::Matrix3d &C_nb,
                                                 const Eigen::Vector3d &w_b) {
   // TODO: set process / system equation:
   // a. set process equation for delta vel:
-  Eigen::Matrix3d f_skew;
-  f_skew << 0, -f_n(2), f_n(1),
-            f_n(2), 0, -f_n(0),
-            -f_n(1), f_n(0), 0;
-  F_.block<3, 3>(3, 6) = -C_nb*f_skew;
+  F_.block<3, 3>(3, 6) = -C_nb*Sophus::SO3d::hat(f_n);
   F_.block<3, 3>(3, 9) = -C_nb;
   // b. set process equation for delta ori:
-  F_.block<3, 3>(6, 6) = -f_skew;
+  F_.block<3, 3>(6, 6) = -Sophus::SO3d::hat(w_b);
   B_.block<3, 3>(3, 0) = C_nb;
 }
 
