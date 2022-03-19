@@ -232,12 +232,22 @@ void IMUPreIntegrator::UpdateState(void) {
     // 3. get a_mid:
     // 4. update relative translation:
     // 5. update relative velocity:
-
+    w_mid = 0.5 * (prev_w + curr_w);
+    prev_theta_ij = state.theta_ij_;
+    d_theta_ij = Sophus::SO3d::exp(w_mid*T);
+    curr_theta_ij = prev_theta_ij * d_theta_ij;  
+    state.theta_ij_ = curr_theta_ij; 
+    a_mid = 0.5 * (prev_theta_ij * prev_a + curr_theta_ij * curr_a);
+    state.alpha_ij_ += state.beta_ij_ * T + 0.5 * a_mid * T * T;
+    state.beta_ij_ += a_mid * T;   
     //
     // TODO: b. update covariance:
     //
     // 1. intermediate results:
-
+    prev_R = prev_theta_ij.matrix();
+    curr_R = curr_theta_ij.matrix();
+    prev_R_a_hat = prev_R * Sophus::SO3d::hat(prev_a);
+    curr_R_a_hat = curr_R * Sophus::SO3d::hat(curr_a);
     //
     // TODO: 2. set up F:
     //
@@ -245,20 +255,40 @@ void IMUPreIntegrator::UpdateState(void) {
     // F14 & F34:
     // F15 & F35:
     // F22:
-
+    // F12,F14,F15
+    F_.block<3, 3>(INDEX_ALPHA, INDEX_THETA) = -0.25 * T * (prev_R_a_hat + curr_R_a_hat * (Eigen::Matrix3d::Identity() - Sophus::SO3d::hat(w_mid) * T));
+    F_.block<3, 3>(INDEX_ALPHA, INDEX_B_A) = -0.25 * T * (prev_R + curr_R);
+    F_.block<3, 3>(INDEX_ALPHA, INDEX_B_G) = 0.25 * T * T * curr_R_a_hat;
+    // F32,F34,F35
+    F_.block<3, 3>(INDEX_BETA, INDEX_THETA) = -0.5 * (prev_R_a_hat + curr_R_a_hat * (Eigen::Matrix3d::Identity() - Sophus::SO3d::hat(w_mid) * T));
+    F_.block<3, 3>(INDEX_BETA, INDEX_B_A) = -0.5 * (prev_R + curr_R);
+    F_.block<3, 3>(INDEX_BETA, INDEX_B_G) = 0.5 * T * curr_R_a_hat;
+    // F22
+    F_.block<3, 3>(INDEX_THETA, INDEX_THETA) = - Sophus::SO3d::hat(w_mid);
     //
     // TODO: 3. set up G:
     //
     // G11 & G31:
+    B_.block<3, 3>(INDEX_ALPHA, INDEX_M_ACC_PREV) = 0.25 * prev_R * T;
+    B_.block<3, 3>(INDEX_BETA, INDEX_M_ACC_PREV) = 0.5 * prev_R;    
     // G12 & G32:
+    B_.block<3, 3>(INDEX_ALPHA, INDEX_M_GYR_PREV) = -0.125*T*T*curr_R*curr_R_a_hat;
+    B_.block<3, 3>(INDEX_BETA, INDEX_M_GYR_PREV) = -0.25*T*curr_R*curr_R_a_hat;    
     // G13 & G33:
+    B_.block<3, 3>(INDEX_ALPHA, INDEX_M_ACC_CURR) = 0.25*T*curr_R;
+    B_.block<3, 3>(INDEX_M_ACC_CURR, INDEX_M_ACC_CURR) = 0.5*curr_R;        
     // G14 & G34:
+    B_.block<3, 3>(INDEX_ALPHA, INDEX_M_GYR_CURR) = -0.125*T*T*curr_R*curr_R_a_hat;    
+    B_.block<3, 3>(INDEX_BETA, INDEX_M_GYR_CURR) = -0.25*T*curr_R*curr_R_a_hat;    
 
     // TODO: 4. update P_:
-
+    MatrixF F = MatrixF::Identity() + T*F_;
+    MatrixB B = T*B_; 
+    P_ = F * P_ * F.transpose() + B * Q_ * B.transpose();
     // 
     // TODO: 5. update Jacobian:
     //
+    J_ = F * J_;
 }
 
 } // namespace lidar_localization

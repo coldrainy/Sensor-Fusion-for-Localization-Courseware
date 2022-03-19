@@ -207,6 +207,7 @@ void G2oGraphOptimizer::AddPRVAGNode(
     measurement.b_a = lio_key_frame.bias.accel.cast<double>();
     measurement.b_g = lio_key_frame.bias.gyro.cast<double>();
     
+    // 设定初值
     vertex->setEstimate(measurement);
 
     // for first vertex:
