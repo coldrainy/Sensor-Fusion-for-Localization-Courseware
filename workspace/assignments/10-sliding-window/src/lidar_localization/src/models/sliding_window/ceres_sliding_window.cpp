@@ -254,6 +254,9 @@ bool CeresSlidingWindow::Optimize() {
             ceres::LocalParameterization *local_parameterization = new sliding_window::ParamPRVAG();
 
             // TODO: add parameter block:
+            for (int i=0; i<GetNumParamBlocks(), ++i) {
+                problem.AddParameterBlock(optimized_key_frames_[i].prvag, 15, local_parameterization);
+            }
         }
 
         // TODO: add residual blocks:

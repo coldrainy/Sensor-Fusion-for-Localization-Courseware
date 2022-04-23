@@ -18,7 +18,7 @@
 
 namespace sliding_window {
 
-class FactorPRVAGMapMatchingPose : public ceres::SizedCostFunction<6, 15> {
+class FactorPRVAGMapMatchingPose : public ceres::SizedCostFunction<6/*残差为6维*/, 15/*一个参数块，为15维*/> {
 public:
 	static const int INDEX_P = 0;
 	static const int INDEX_R = 3;
